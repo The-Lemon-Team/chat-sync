@@ -1,0 +1,121 @@
+// Chat-Sync: Offline Telegram client & personal journal manager
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum ChatType {
+  SAVED_MESSAGES
+  GROUP
+  CHANNEL
+  OFFLINE_JOURNAL
+}
+
+/// Режим синхронизации чата-форка (на уровне чата)
+enum ChatSyncMode {
+  LIVE
+  SCHEDULED
+  MANUAL
+  OFFLINE_ONLY
+}
+
+/// Статус синхронизации отдельного сообщения
+enum MessageSyncStatus {
+  PENDING
+  SYNCED
+  OFFLINE_ONLY
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+/// Telegram-аккаунт пользователя. isHub = «Маточный Хаб».
+/// parentId формирует иерархию: Хаб → дочерние локальные профили.
+model TelegramAccount {
+  id            String   @id @default(cuid())
+  phone         String   @unique
+  sessionString String   @db.Text
+  isActive      Boolean  @default(true)
+  isHub         Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  /// Родительский аккаунт (обычно Хаб)
+  parentId String?
+  parent   TelegramAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children TelegramAccount[] @relation("AccountHierarchy")
+
+  chatForks ChatFork[]
+
+  @@index([parentId])
+  @@index([isHub])
+  @@map("telegram_accounts")
+}
+
+/// Локальный «форк» Telegram-чата или автономный оффлайн-журнал.
+model ChatFork {
+  id             String       @id @default(cuid())
+  telegramChatId String?      /// null для чисто оффлайн-журналов (OFFLINE_JOURNAL)
+  title          String
+  type           ChatType
+  syncMode       ChatSyncMode @default(MANUAL)
+  syncInterval   Int?         /// интервал в минутах (для SCHEDULED)
+  lastSyncedAt   DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  accountId String
+  account   TelegramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  messages Message[]
+
+  @@unique([accountId, telegramChatId])
+  @@index([accountId])
+  @@index([syncMode])
+  @@map("chat_forks")
+}
+
+/// Сообщение внутри чата-форка.
+/// localId — стабильный UUID на клиенте; telegramMessageId — ID в Telegram (nullable для оффлайн).
+model Message {
+  id                String            @id @default(cuid())
+  localId           String            @default(uuid()) @db.Uuid
+  telegramMessageId BigInt?
+  text              String            @db.Text
+  syncStatus        MessageSyncStatus @default(PENDING)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  chatForkId String
+  chatFork   ChatFork @relation(fields: [chatForkId], references: [id], onDelete: Cascade)
+
+  mediaFiles MediaFile[]
+
+  @@unique([chatForkId, localId])
+  @@unique([chatForkId, telegramMessageId])
+  @@index([chatForkId, createdAt])
+  @@index([syncStatus])
+  @@map("messages")
+}
+
+/// Медиафайл, привязанный к сообщению.
+model MediaFile {
+  id             String  @id @default(cuid())
+  localPath      String  /// путь на диске сервера
+  telegramFileId String?
+  mimeType       String?
+  fileSize       BigInt?
+
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("media_files")
+}

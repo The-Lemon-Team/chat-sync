@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chat-sync-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"  # 5432 часто занят локальным PostgreSQL на Windows
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chat_sync
+    volumes:
+      - chat_sync_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d chat_sync"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  chat_sync_pgdata:
