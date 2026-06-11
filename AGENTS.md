@@ -27,9 +27,9 @@ Offline Telegram client and personal journal manager. Hub account pulls TG conte
 - [x] Telegram auth (GramJS)
 - [x] SyncService + ChatGateway
 - [x] ChatFork REST API
-- [ ] Vue 3 frontend scaffold
-- [ ] Dexie + Pinia stores
-- [ ] vue-advanced-chat wrapper
+- [x] Vue 3 frontend scaffold (Safe Mode, manual chat pick)
+- [ ] Dexie full offline sync polish
+- [ ] vue-advanced-chat sync badge styling
 
 ## Commands
 ```bash

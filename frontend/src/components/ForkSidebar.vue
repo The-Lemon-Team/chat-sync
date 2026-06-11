@@ -1,0 +1,45 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+import { useChatStore } from '@/stores/chat';
+import AddChatModal from './AddChatModal.vue';
+
+const chatStore = useChatStore();
+const showAddModal = ref(false);
+</script>
+
+<template>
+  <aside class="flex w-72 shrink-0 flex-col border-r border-slate-800 bg-slate-900">
+    <div class="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+      <h1 class="text-sm font-semibold tracking-wide text-slate-200">Chat-Sync</h1>
+      <button
+        type="button"
+        class="rounded bg-indigo-600 px-2 py-1 text-xs font-medium hover:bg-indigo-500"
+        @click="showAddModal = true"
+      >
+        + Чат
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto">
+      <p v-if="chatStore.loading && !chatStore.forks.length" class="p-4 text-sm text-slate-500">
+        Загрузка...
+      </p>
+      <p v-else-if="!chatStore.forks.length" class="p-4 text-sm text-slate-500">
+        Нет добавленных чатов. Нажмите «+ Чат» для выбора.
+      </p>
+      <button
+        v-for="fork in chatStore.forks"
+        :key="fork.id"
+        type="button"
+        class="flex w-full flex-col border-b border-slate-800 px-4 py-3 text-left hover:bg-slate-800"
+        :class="chatStore.activeForkId === fork.id ? 'bg-slate-800' : ''"
+        @click="chatStore.selectFork(fork.id)"
+      >
+        <span class="truncate font-medium">{{ fork.title }}</span>
+        <span class="mt-0.5 text-xs text-slate-500">{{ fork.syncMode }}</span>
+      </button>
+    </div>
+
+    <AddChatModal v-if="showAddModal" @close="showAddModal = false" />
+  </aside>
+</template>

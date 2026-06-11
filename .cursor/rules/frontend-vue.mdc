@@ -26,6 +26,12 @@ Map our `MessageSyncStatus` to custom indicators:
 - `SYNCED` → "Saved to TG + Offline" ✓✓
 - `OFFLINE_ONLY` / `PENDING` → "Offline only" ○
 
-## API Base
-Backend default: `http://localhost:3000`
-WebSocket: `ws://localhost:3000/chat`
+## Safe Mode (default ON)
+- All outbound Telegram actions go through `OutboundGuard` in `src/services/outbound-guard.ts`
+- `useSafetyStore` blocks `send_telegram` until user explicitly unlocks LIVE
+- New chat forks default to `syncMode: MANUAL` — no auto-import
+
+## Chat Selection
+- Never bulk-import all dialogs on login
+- User picks specific chats via `AddChatModal` → `POST /chat-forks`
+- Backend: `GET /telegram/accounts/:id/dialogs` lists available dialogs only

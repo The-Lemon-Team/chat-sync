@@ -22,7 +22,15 @@ export class ChatForkService {
     return fork;
   }
 
-  create(dto: CreateChatForkDto) {
+  async create(dto: CreateChatForkDto) {
+    const account = await this.prisma.telegramAccount.findUnique({
+      where: { id: dto.accountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Account ${dto.accountId} not found`);
+    }
+
     return this.prisma.chatFork.create({
       data: {
         accountId: dto.accountId,

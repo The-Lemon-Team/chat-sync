@@ -27,3 +27,8 @@ Thumbs.db
 
 # Sync media storage
 storage/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
