@@ -1,0 +1,33 @@
+---
+description: Prisma schema and database conventions
+globs: backend/prisma/**
+alwaysApply: false
+---
+
+# Database (Prisma + PostgreSQL)
+
+## Key Models
+- `TelegramAccount` — self-referencing hierarchy via `parentId`, one `isHub`
+- `ChatFork` — local chat fork; `telegramChatId` nullable for `OFFLINE_JOURNAL`
+- `Message` — `localId` (UUID) for client-side identity; `telegramMessageId` nullable
+- `MediaFile` — server-side `localPath`, optional `telegramFileId`
+
+## Enums
+- `ChatSyncMode`: chat-level sync behavior
+- `MessageSyncStatus`: per-message sync state (distinct from ChatSyncMode)
+
+## Unique Constraints
+- `(accountId, telegramChatId)` — one fork per TG chat per account
+- `(chatForkId, localId)` — client dedup
+- `(chatForkId, telegramMessageId)` — TG dedup
+
+## Migrations
+```bash
+cd backend && npx prisma migrate dev --name <name>
+```
+
+## Docker DB
+PostgreSQL runs on port **5433** (5432 often occupied locally):
+```bash
+npm run db:up
+```

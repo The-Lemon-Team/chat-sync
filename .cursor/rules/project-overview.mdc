@@ -1,0 +1,37 @@
+---
+description: Chat-Sync project overview, philosophy, and architecture
+alwaysApply: true
+---
+
+# Chat-Sync — Offline Telegram Journal
+
+## Mission
+NOT a classic online messenger. Migrate Telegram channels/chats into fully autonomous **offline forks**. Active chatting is not the goal.
+
+## Core Concepts
+- **Hub Account** (`isHub: true`): main account that pulls content and distributes offline copies
+- **Chat Fork**: local mirror of a TG chat/channel or pure offline journal
+- **SyncMode** (chat level): `LIVE` | `SCHEDULED` | `MANUAL` | `OFFLINE_ONLY`
+- **MessageSyncStatus**: `PENDING` | `SYNCED` | `OFFLINE_ONLY`
+
+## Stack
+| Layer | Tech |
+|---|---|
+| Backend | NestJS, Prisma, PostgreSQL, GramJS (MTProto, NOT Bot API) |
+| Frontend | Vue 3, Vite, Pinia, Dexie.js, Tailwind, vue-advanced-chat |
+| Realtime | Socket.IO namespace `/chat` |
+
+## Repo Layout
+```
+backend/     NestJS API + GramJS + Prisma
+frontend/    Vue 3 SPA (offline-first via Dexie)
+.cursor/rules/   AI guidance
+```
+
+## UI Sync Indicators
+Messages must clearly show: **"Saved to TG + Offline"** vs **"Offline only"**.
+
+## Principles
+- Offline-first: Dexie mirrors server data for instant access
+- Minimize scope; match existing conventions
+- Never commit `.env` or `storage/` media files

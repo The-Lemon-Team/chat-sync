@@ -1,0 +1,31 @@
+---
+description: Vue 3 frontend conventions for chat-sync
+globs: frontend/**/*
+alwaysApply: false
+---
+
+# Frontend (Vue 3)
+
+## Stack
+Vue 3 + Vite + Pinia + Dexie.js + Tailwind CSS + vue-advanced-chat
+
+## Offline-First
+1. Read from Dexie (IndexedDB) instantly
+2. If online — fetch REST updates, merge into Dexie
+3. Subscribe to WebSocket `/chat` for realtime
+
+## Dexie Schema
+Mirror Prisma models: `accounts`, `chatForks`, `messages`, `mediaFiles`
+
+## Pinia Stores
+- `account.ts` — Telegram accounts, hub flag
+- `chat.ts` — chat forks, messages, sync with Dexie + backend
+
+## vue-advanced-chat Wrapper
+Map our `MessageSyncStatus` to custom indicators:
+- `SYNCED` → "Saved to TG + Offline" ✓✓
+- `OFFLINE_ONLY` / `PENDING` → "Offline only" ○
+
+## API Base
+Backend default: `http://localhost:3000`
+WebSocket: `ws://localhost:3000/chat`

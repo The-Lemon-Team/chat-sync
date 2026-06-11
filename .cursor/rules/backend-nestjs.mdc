@@ -1,0 +1,41 @@
+---
+description: NestJS backend conventions for chat-sync
+globs: backend/**/*.ts
+alwaysApply: false
+---
+
+# Backend (NestJS)
+
+## Modules
+- `telegram/` — GramJS client pool, auth flow
+- `sync/` — message history pull, media download, scheduler
+- `chat/` — WebSocket gateway (`/chat` namespace)
+- `chat-fork/` — REST CRUD + manual sync trigger
+
+## GramJS Rules
+- Use **MTProto user sessions** via `StringSession`, never Bot API
+- Access clients via `TelegramManagerService.getClient(accountId)`
+- Store sessions encrypted in `TelegramAccount.sessionString` (encryption TBD)
+
+## SyncService
+- Respects `ChatSyncMode`: skip fetch for `OFFLINE_ONLY`
+- Downloads media to `MEDIA_STORAGE_PATH/{chatForkId}/{messageId}/`
+- Emits WebSocket events: `message:new`, `sync:progress`
+
+## API Endpoints
+```
+POST /telegram/auth/{start,code,password}
+GET  /chat-forks
+POST /chat-forks
+POST /chat-forks/:id/sync
+GET  /chat-forks/:id/messages
+```
+
+## WebSocket (namespace `/chat`)
+```typescript
+socket.emit('join', chatForkId);
+// events: message:new, message:updated, sync:progress
+```
+
+## BigInt
+Serialize `telegramMessageId` and `fileSize` as strings in JSON responses.
