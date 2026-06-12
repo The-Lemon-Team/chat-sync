@@ -81,9 +81,9 @@ cd frontend && npm run test:api
 | 10.06.26 | `6a06fc2` | Initial backend: Prisma, GramJS auth, Docker |
 | 11.06.26 | `89c9560` | SyncService, ChatGateway, Cursor rules |
 | 12.06.26 | `fb458ae` | Vue 3 frontend, Safe Mode, dialogs API |
-| 12.06.26 | *(pending)* | User auth JWT, Hub/Chat Account model |
-| 12.06.26 | *(pending)* | Auth UI, Chat Account UI, account refactor |
-| 12.06.26 | *(pending)* | Docs handoff: memory, cursor rules sync |
+| 12.06.26 | `6a744d4` | User auth JWT, Hub/Chat Account model |
+| 12.06.26 | `e7c2e6b` | Auth UI, Chat Account UI, account refactor |
+| 12.06.26 | `c771553` | Docs handoff: memory, cursor rules sync |
 
 ## Следующий фокус
 

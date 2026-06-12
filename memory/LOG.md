@@ -28,6 +28,8 @@
 - `hub-chat-accounts.mdc`, обновлены `project-overview`, `backend-nestjs`, `prisma-database`, `AGENTS.md`
 - Kanban: User auth, Hub/Chat model, Chat Account UI, Telegram auth UI → Done
 
+**Коммиты:** `6a744d4` (backend), `e7c2e6b` (frontend), `c771553` (docs)
+
 **Следующий шаг:** Dexie offline polish, sync badge UI, POST /messages
 
 ---
