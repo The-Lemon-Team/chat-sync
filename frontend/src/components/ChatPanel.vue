@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useChatStore } from '@/stores/chat';
+import { useThemeStore } from '@/stores/theme';
 import { mapMessagesToVac } from '@/composables/useVacMapper';
 
 const chatStore = useChatStore();
+const themeStore = useThemeStore();
 const roomId = computed(() => chatStore.activeForkId ?? 'empty');
 const currentUserId = ref('local-user');
 
@@ -20,10 +22,14 @@ async function onSendMessage(event: CustomEvent) {
 </script>
 
 <template>
-  <section class="flex flex-1 flex-col bg-slate-950">
+  <section
+    class="flex flex-1 flex-col bg-slate-950 dark:bg-slate-950"
+    :class="!themeStore.nightMode && 'bg-slate-50'"
+  >
     <header
       v-if="chatStore.activeFork"
-      class="flex items-center justify-between border-b border-slate-800 px-4 py-3"
+      class="flex items-center justify-between border-b border-slate-800 px-4 py-3 dark:border-slate-800"
+      :class="!themeStore.nightMode && 'border-slate-200 bg-white'"
     >
       <div>
         <h2 class="font-semibold">{{ chatStore.activeFork.title }}</h2>

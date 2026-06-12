@@ -6,14 +6,48 @@ export type MessageSyncStatus = 'PENDING' | 'SYNCED' | 'OFFLINE_ONLY';
 
 export type OutboundAction = 'send_telegram' | 'sync_pull' | 'sync_push';
 
-export interface TelegramAccount {
-  id: string;
-  phone: string;
-  isActive: boolean;
-  isHub: boolean;
-  parentId: string | null;
-  createdAt: string;
+export type TelegramAccountRole = 'HUB' | 'CHAT';
+
+export type ChatAccountSource = 'HUB_CLONE' | 'CLEAN';
+
+export interface AccountCapabilities {
+  canSearch: boolean;
+  canSubscribe: boolean;
+  canSyncFromHub: boolean;
 }
+
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt?: string;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  user: User;
+}
+
+export type AuthStepResult =
+  | { step: 'code_sent'; phone: string }
+  | { step: 'password_required'; phone: string }
+  | { step: 'authorized'; accountId: string; phone: string; role: 'HUB' };
+
+export interface AppAccount {
+  id: string;
+  role: TelegramAccountRole;
+  phone: string | null;
+  displayName: string | null;
+  source: ChatAccountSource | null;
+  hubSourceId: string | null;
+  hubDetachedAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  capabilities: AccountCapabilities;
+}
+
+/** @deprecated use AppAccount */
+export type TelegramAccount = AppAccount;
 
 export interface TelegramDialog {
   telegramChatId: string;

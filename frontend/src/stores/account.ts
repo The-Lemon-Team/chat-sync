@@ -1,46 +1,66 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { accountsApi } from '@/api';
+import { chatAccountsApi, hubApi } from '@/api';
 import { db } from '@/db/dexie';
-import type { TelegramAccount, TelegramDialog } from '@/types';
+import type { AppAccount, TelegramDialog } from '@/types';
 
 export const useAccountStore = defineStore('account', () => {
-  const accounts = ref<TelegramAccount[]>([]);
+  const hub = ref<AppAccount | null>(null);
+  const chatAccounts = ref<AppAccount[]>([]);
   const dialogs = ref<TelegramDialog[]>([]);
-  const selectedAccountId = ref<string | null>(null);
+  const selectedChatAccountId = ref<string | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
-  const hubAccount = computed(() => accounts.value.find((a) => a.isHub));
-  const selectedAccount = computed(() =>
-    accounts.value.find((a) => a.id === selectedAccountId.value),
+  const selectedChatAccount = computed(() =>
+    chatAccounts.value.find((a) => a.id === selectedChatAccountId.value),
   );
+
+  const hasHub = computed(() => !!hub.value?.isActive);
 
   async function loadAccounts() {
     loading.value = true;
     error.value = null;
     try {
-      const remote = await accountsApi.list();
-      accounts.value = remote;
-      await db.accounts.bulkPut(remote);
+      const [hubAccount, chats] = await Promise.all([
+        hubApi.get(),
+        chatAccountsApi.list(),
+      ]);
 
-      if (!selectedAccountId.value && remote.length) {
-        const hub = remote.find((a) => a.isHub) ?? remote[0];
-        selectedAccountId.value = hub.id;
+      hub.value = hubAccount;
+      chatAccounts.value = chats;
+
+      await db.accounts.bulkPut([
+        ...(hubAccount ? [hubAccount] : []),
+        ...chats,
+      ]);
+
+      if (
+        !selectedChatAccountId.value ||
+        !chats.some((a) => a.id === selectedChatAccountId.value)
+      ) {
+        selectedChatAccountId.value = chats[0]?.id ?? null;
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load accounts';
-      accounts.value = await db.accounts.toArray();
+      const cached = await db.accounts.toArray();
+      hub.value = cached.find((a) => a.role === 'HUB') ?? null;
+      chatAccounts.value = cached.filter((a) => a.role === 'CHAT');
     } finally {
       loading.value = false;
     }
   }
 
-  async function loadDialogs(accountId: string) {
+  async function loadHubDialogs() {
+    if (!hub.value) {
+      dialogs.value = [];
+      return;
+    }
+
     loading.value = true;
     error.value = null;
     try {
-      dialogs.value = await accountsApi.dialogs(accountId);
+      dialogs.value = await hubApi.dialogs();
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load dialogs';
       dialogs.value = [];
@@ -49,20 +69,48 @@ export const useAccountStore = defineStore('account', () => {
     }
   }
 
-  function selectAccount(id: string) {
-    selectedAccountId.value = id;
+  async function createChatAccount(
+    displayName: string,
+    source: 'HUB_CLONE' | 'CLEAN',
+    telegramChatIds?: string[],
+  ) {
+    const account = await chatAccountsApi.create(
+      displayName,
+      source,
+      telegramChatIds,
+    );
+    chatAccounts.value = [...chatAccounts.value, account];
+    await db.accounts.put(account);
+    selectedChatAccountId.value = account.id;
+    return account;
+  }
+
+  function selectChatAccount(id: string) {
+    selectedChatAccountId.value = id;
+  }
+
+  function reset() {
+    hub.value = null;
+    chatAccounts.value = [];
+    dialogs.value = [];
+    selectedChatAccountId.value = null;
+    loading.value = false;
+    error.value = null;
   }
 
   return {
-    accounts,
+    hub,
+    chatAccounts,
     dialogs,
-    selectedAccountId,
-    selectedAccount,
-    hubAccount,
+    selectedChatAccountId,
+    selectedChatAccount,
+    hasHub,
     loading,
     error,
     loadAccounts,
-    loadDialogs,
-    selectAccount,
+    loadHubDialogs,
+    createChatAccount,
+    selectChatAccount,
+    reset,
   };
 });

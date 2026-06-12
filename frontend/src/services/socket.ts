@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { getStoredToken } from '@/api/client';
 import type { Message, SyncProgress } from '@/types';
 
 const WS_BASE = import.meta.env.VITE_WS_URL ?? 'http://localhost:3000';
@@ -7,12 +8,27 @@ let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
+    const token = getStoredToken();
     socket = io(`${WS_BASE}/chat`, {
       transports: ['websocket'],
-      autoConnect: true,
+      autoConnect: !!token,
+      auth: token ? { token } : undefined,
     });
   }
   return socket;
+}
+
+export function connectSocket() {
+  const token = getStoredToken();
+  if (!token) return;
+
+  if (socket) {
+    socket.auth = { token };
+    if (!socket.connected) socket.connect();
+    return;
+  }
+
+  getSocket();
 }
 
 export function joinForkRoom(chatForkId: string) {

@@ -15,9 +15,9 @@ const adding = ref(false);
 const localError = ref<string | null>(null);
 
 watch(
-  () => accountStore.selectedAccountId,
-  (id) => {
-    if (id) accountStore.loadDialogs(id);
+  () => accountStore.hub?.id,
+  (hubId) => {
+    if (hubId) accountStore.loadHubDialogs();
   },
   { immediate: true },
 );
@@ -35,7 +35,7 @@ async function addDialog(telegramChatId: string) {
   const dialog = accountStore.dialogs.find(
     (d) => d.telegramChatId === telegramChatId,
   );
-  const accountId = accountStore.selectedAccountId;
+  const accountId = accountStore.selectedChatAccountId;
   if (!dialog || !accountId) return;
 
   adding.value = true;
@@ -57,7 +57,7 @@ async function addDialog(telegramChatId: string) {
       <div class="border-b border-slate-700 px-4 py-3">
         <h2 class="text-lg font-semibold">Добавить чат</h2>
         <p class="mt-1 text-xs text-slate-400">
-          Выберите конкретный чат. Массовый импорт не выполняется.
+          Диалоги из Hub → в выбранный Chat Account. Массовый импорт не выполняется.
         </p>
       </div>
 

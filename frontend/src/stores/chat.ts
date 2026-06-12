@@ -179,6 +179,17 @@ export const useChatStore = defineStore('chat', () => {
     unsubscribeSync?.();
   }
 
+  function reset() {
+    cleanup();
+    forks.value = [];
+    messages.value = [];
+    activeForkId.value = null;
+    syncProgress.value = null;
+    loading.value = false;
+    syncing.value = false;
+    error.value = null;
+  }
+
   return {
     forks,
     messages,
@@ -196,5 +207,6 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage,
     initSocketListeners,
     cleanup,
+    reset,
   };
 });
