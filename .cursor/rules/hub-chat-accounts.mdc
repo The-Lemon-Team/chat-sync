@@ -1,0 +1,50 @@
+---
+description: Hub Telegram Account and Chat Account concepts
+alwaysApply: false
+---
+
+# Hub & Chat Accounts
+
+## Hub Telegram Account (`role: HUB`)
+- **Один на пользователя** — реальная TG-сессия (GramJS)
+- Назначение: просмотр диалогов, подписка на каналы/группы, источник контента для оффлайн-копий
+- API: `GET /telegram/hub`, `GET /telegram/hub/dialogs`, `POST /telegram/auth/*`
+- Capabilities: `canSearch`, `canSubscribe` (только при активном Hub)
+
+## Chat Account (`role: CHAT`)
+- **Сколько угодно** — рабочее пространство без TG-сессии
+- Все `ChatFork` создаются только на Chat Account
+- Источник создания (`source`):
+  - `HUB_CLONE` — массовый экспорт выбранных чатов Hub (`telegramChatIds`); копирует сообщения если форк уже есть на Hub
+  - `CLEAN` — пустой аккаунт
+- Связь с Hub: `hubSourceId` → Hub; `hubDetachedAt` — sync из Hub отключён
+- API: `GET/POST /chat-accounts`
+- Capability: `canSyncFromHub` — Hub активен, source=HUB_CLONE, hubDetachedAt=null
+
+## Удаление Hub (будущая реализация)
+1. Установить `hubDetachedAt` на всех связанных Chat Accounts
+2. Сохранить существующие форки и сообщения
+3. Отключить sync (`HUB_UNAVAILABLE`)
+4. Приостановить поиск/подписку (`canSearch=false`, `canSubscribe=false`)
+
+## Алгоритм: Chat Account запрашивает подписку на канал
+
+Подписка в Telegram выполняется **только через Hub**. Chat Account не имеет TG-сессии.
+
+```
+Chat Account UI → POST /chat-accounts/:id/subscription-requests { channelId, ... }
+       ↓
+Backend проверяет: Hub активен? Chat Account принадлежит user?
+       ↓
+HubSubscriptionService → GramJS join/subscribe на Hub-клиенте
+       ↓
+Успех → опционально добавить ChatFork в Hub (для последующего sync/клонирования)
+       ↓
+WebSocket / уведомление Chat Account о результате
+```
+
+**Статусы запроса (будущая модель):** `PENDING` → `HUB_PROCESSING` → `SUBSCRIBED` | `FAILED` | `HUB_UNAVAILABLE`
+
+**Если Hub отсутствует:** запрос отклоняется с `HUB_UNAVAILABLE`; UI предлагает подключить Hub.
+
+См. kanban: [[Hub search & subscribe]], [[Chat subscription request flow]].

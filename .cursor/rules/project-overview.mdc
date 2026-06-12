@@ -9,8 +9,10 @@ alwaysApply: true
 NOT a classic online messenger. Migrate Telegram channels/chats into fully autonomous **offline forks**. Active chatting is not the goal.
 
 ## Core Concepts
-- **Hub Account** (`isHub: true`): main account that pulls content and distributes offline copies
-- **Chat Fork**: local mirror of a TG chat/channel or pure offline journal
+- **User** — владелец всех данных; email + JWT auth
+- **Hub Telegram Account** (`role: HUB`): один на пользователя, TG-сессия для просмотра/подписки/источника контента
+- **Chat Account** (`role: CHAT`): рабочее пространство, много на пользователя; `HUB_CLONE` или `CLEAN`
+- **Chat Fork**: local mirror of a TG chat/channel or pure offline journal (привязан к Chat Account)
 - **SyncMode** (chat level): `LIVE` | `SCHEDULED` | `MANUAL` | `OFFLINE_ONLY`
 - **MessageSyncStatus**: `PENDING` | `SYNCED` | `OFFLINE_ONLY`
 
@@ -26,6 +28,7 @@ NOT a classic online messenger. Migrate Telegram channels/chats into fully auton
 backend/     NestJS API + GramJS + Prisma
 frontend/    Vue 3 SPA (offline-first via Dexie)
 .cursor/rules/   AI guidance
+memory/        Work logs, summary, Obsidian kanban
 ```
 
 ## UI Sync Indicators

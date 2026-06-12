@@ -18,8 +18,10 @@ Vue 3 + Vite + Pinia + Dexie.js + Tailwind CSS + vue-advanced-chat
 Mirror Prisma models: `accounts`, `chatForks`, `messages`, `mediaFiles`
 
 ## Pinia Stores
-- `account.ts` — Telegram accounts, hub flag
+- `auth.ts` — JWT login/register, token in API client
+- `account.ts` — Hub + Chat Accounts (`hub`, `chatAccounts`, `selectedChatAccountId`)
 - `chat.ts` — chat forks, messages, sync with Dexie + backend
+- `theme.ts`, `ui.ts` — night mode, sidebar state
 
 ## vue-advanced-chat Wrapper
 Map our `MessageSyncStatus` to custom indicators:
@@ -31,7 +33,9 @@ Map our `MessageSyncStatus` to custom indicators:
 - `useSafetyStore` blocks `send_telegram` until user explicitly unlocks LIVE
 - New chat forks default to `syncMode: MANUAL` — no auto-import
 
-## Chat Selection
+## Account & Chat Selection
+- Hub connect: `TelegramAuthModal` → `POST /telegram/auth/*` (Hub only)
+- Chat Account: `CreateChatAccountModal` → `POST /chat-accounts` (CLEAN or HUB_CLONE)
 - Never bulk-import all dialogs on login
-- User picks specific chats via `AddChatModal` → `POST /chat-forks`
-- Backend: `GET /telegram/accounts/:id/dialogs` lists available dialogs only
+- User picks specific chats via `AddChatModal` → `POST /chat-forks` (on selected Chat Account)
+- Backend: `GET /telegram/hub/dialogs` lists Hub dialogs for export/pick

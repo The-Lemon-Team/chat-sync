@@ -7,10 +7,13 @@ alwaysApply: false
 # Backend (NestJS)
 
 ## Modules
-- `telegram/` — GramJS client pool, auth flow
+- `auth/` — JWT register/login, guards
+- `chat-account/` — Chat Account CRUD, HUB_CLONE export
+- `telegram/` — GramJS client pool, Hub auth flow
 - `sync/` — message history pull, media download, scheduler
 - `chat/` — WebSocket gateway (`/chat` namespace)
 - `chat-fork/` — REST CRUD + manual sync trigger
+- `common/` — ownership checks, mappers, decorators
 
 ## GramJS Rules
 - Use **MTProto user sessions** via `StringSession`, never Bot API
@@ -24,9 +27,15 @@ alwaysApply: false
 
 ## API Endpoints
 ```
-POST /telegram/auth/{start,code,password}
+POST /auth/{register,login}
+GET  /auth/me
+POST /telegram/auth/{start,code,password}   # Hub only
+GET  /telegram/hub
+GET  /telegram/hub/dialogs
+GET  /chat-accounts
+POST /chat-accounts                         # { displayName, source, telegramChatIds? }
 GET  /chat-forks
-POST /chat-forks
+POST /chat-forks                            # accountId = Chat Account
 POST /chat-forks/:id/sync
 GET  /chat-forks/:id/messages
 ```

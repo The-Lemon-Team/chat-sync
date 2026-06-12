@@ -7,8 +7,9 @@ alwaysApply: false
 # Database (Prisma + PostgreSQL)
 
 ## Key Models
-- `TelegramAccount` — self-referencing hierarchy via `parentId`, one `isHub`
-- `ChatFork` — local chat fork; `telegramChatId` nullable for `OFFLINE_JOURNAL`
+- `User` — app account (email, passwordHash)
+- `TelegramAccount` — `role: HUB | CHAT`; Hub has phone/sessionString; Chat has displayName/source
+- `ChatFork` — local chat fork on Chat Account; `telegramChatId` nullable for `OFFLINE_JOURNAL`
 - `Message` — `localId` (UUID) for client-side identity; `telegramMessageId` nullable
 - `MediaFile` — server-side `localPath`, optional `telegramFileId`
 
