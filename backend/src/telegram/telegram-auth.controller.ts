@@ -1,4 +1,8 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import {
+  AuthUser,
+  CurrentUser,
+} from '../common/decorators/current-user.decorator';
 import { StartAuthDto } from './dto/start-auth.dto';
 import { SubmitCodeDto } from './dto/submit-code.dto';
 import { SubmitPasswordDto } from './dto/submit-password.dto';
@@ -8,34 +12,26 @@ import { TelegramManagerService } from './telegram-manager.service';
 export class TelegramAuthController {
   constructor(private readonly telegramManager: TelegramManagerService) {}
 
-  /**
-   * POST /telegram/auth/start
-   * Отправляет код авторизации на указанный номер телефона.
-   */
+  /** Привязка Hub Telegram Account (один на пользователя) */
   @Post('start')
-  startAuth(@Body() dto: StartAuthDto) {
-    return this.telegramManager.startAuth(dto.phone, {
-      isHub: dto.isHub,
-      parentId: dto.parentId,
-    });
+  startAuth(@CurrentUser() user: AuthUser, @Body() dto: StartAuthDto) {
+    return this.telegramManager.startHubAuth(dto.phone, user.id);
   }
 
-  /**
-   * POST /telegram/auth/code
-   * Подтверждает код из SMS/Telegram.
-   * Ответ: { step: 'authorized' } или { step: 'password_required' }.
-   */
   @Post('code')
-  submitCode(@Body() dto: SubmitCodeDto) {
-    return this.telegramManager.submitCode(dto.phone, dto.code);
+  submitCode(@CurrentUser() user: AuthUser, @Body() dto: SubmitCodeDto) {
+    return this.telegramManager.submitCode(dto.phone, dto.code, user.id);
   }
 
-  /**
-   * POST /telegram/auth/password
-   * Подтверждает пароль двухфакторной аутентификации (2FA).
-   */
   @Post('password')
-  submitPassword(@Body() dto: SubmitPasswordDto) {
-    return this.telegramManager.submitPassword(dto.phone, dto.password);
+  submitPassword(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SubmitPasswordDto,
+  ) {
+    return this.telegramManager.submitPassword(
+      dto.phone,
+      dto.password,
+      user.id,
+    );
   }
 }

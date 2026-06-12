@@ -15,6 +15,7 @@ import {
   mapMessageToPayload,
   MessageWithMedia,
 } from '../common/mappers/message.mapper';
+import { OwnershipService } from '../common/ownership.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TelegramManagerService } from '../telegram/telegram-manager.service';
 
@@ -37,6 +38,7 @@ export class SyncService {
     private readonly telegramManager: TelegramManagerService,
     private readonly chatGateway: ChatGateway,
     private readonly config: ConfigService,
+    private readonly ownership: OwnershipService,
   ) {
     this.mediaRoot =
       this.config.get<string>('MEDIA_STORAGE_PATH') ??
@@ -114,10 +116,23 @@ export class SyncService {
       };
     }
 
-    const client = this.telegramManager.getClient(chatFork.accountId);
+    const clientAccountId = await this.ownership.resolveTelegramClientAccountId(
+      chatFork.accountId,
+    );
+    if (!clientAccountId) {
+      return {
+        chatForkId,
+        fetched: 0,
+        saved: 0,
+        skipped: true,
+        reason: 'HUB_UNAVAILABLE',
+      };
+    }
+
+    const client = this.telegramManager.getClient(clientAccountId);
     if (!client) {
       throw new BadRequestException(
-        `Telegram client not connected for account ${chatFork.accountId}`,
+        `Telegram client not connected for hub ${clientAccountId}`,
       );
     }
 

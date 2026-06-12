@@ -34,28 +34,63 @@ enum MessageSyncStatus {
   OFFLINE_ONLY
 }
 
+/// Роль аккаунта в иерархии пользователя
+enum TelegramAccountRole {
+  HUB  /// Hub Telegram Account — один на пользователя, реальная TG-сессия
+  CHAT /// Chat Account — рабочее пространство, сколько угодно
+}
+
+/// Как был создан Chat Account
+enum ChatAccountSource {
+  HUB_CLONE /// Полная оффлайн-копия Hub на момент создания
+  CLEAN     /// Пустой аккаунт без копии Hub
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
-/// Telegram-аккаунт пользователя. isHub = «Маточный Хаб».
-/// parentId формирует иерархию: Хаб → дочерние локальные профили.
-model TelegramAccount {
-  id            String   @id @default(cuid())
-  phone         String   @unique
-  sessionString String   @db.Text
-  isActive      Boolean  @default(true)
-  isHub         Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+/// Пользователь приложения. Владелец Hub и Chat Accounts.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  /// Родительский аккаунт (обычно Хаб)
-  parentId String?
-  parent   TelegramAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children TelegramAccount[] @relation("AccountHierarchy")
+  telegramAccounts TelegramAccount[]
+
+  @@map("users")
+}
+
+/// Hub Telegram Account или Chat Account.
+/// HUB: phone + sessionString (GramJS), один на пользователя.
+/// CHAT: displayName, без TG-сессии — платформа для работы с чатами.
+model TelegramAccount {
+  id            String              @id @default(cuid())
+  role          TelegramAccountRole
+  phone         String?             /// только для HUB
+  sessionString String?             @db.Text /// только для HUB
+  displayName   String?             /// только для CHAT
+  source        ChatAccountSource?  /// только для CHAT
+  hubDetachedAt DateTime?           /// Hub удалён/отключён — sync из Hub недоступен
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Hub, из которого была сделана копия (для HUB_CLONE)
+  hubSourceId  String?
+  hubSource    TelegramAccount?  @relation("HubToChatAccounts", fields: [hubSourceId], references: [id], onDelete: SetNull)
+  chatAccounts TelegramAccount[] @relation("HubToChatAccounts")
 
   chatForks ChatFork[]
 
-  @@index([parentId])
-  @@index([isHub])
+  @@unique([userId, phone])
+  @@index([userId])
+  @@index([userId, role])
+  @@index([hubSourceId])
   @@map("telegram_accounts")
 }
 

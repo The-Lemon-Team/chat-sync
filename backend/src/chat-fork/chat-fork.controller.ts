@@ -6,39 +6,50 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import {
+  AuthUser,
+  CurrentUser,
+} from '../common/decorators/current-user.decorator';
+import { OwnershipService } from '../common/ownership.service';
+import { SyncService } from '../sync/sync.service';
 import { ChatForkService } from './chat-fork.service';
 import { CreateChatForkDto } from './dto/create-chat-fork.dto';
-import { SyncService } from '../sync/sync.service';
 
 @Controller('chat-forks')
 export class ChatForkController {
   constructor(
     private readonly chatForkService: ChatForkService,
     private readonly syncService: SyncService,
+    private readonly ownership: OwnershipService,
   ) {}
 
   @Get()
-  findAll(@Query('accountId') accountId?: string) {
-    return this.chatForkService.findAll(accountId);
+  findAll(
+    @CurrentUser() user: AuthUser,
+    @Query('accountId') accountId?: string,
+  ) {
+    return this.chatForkService.findAll(user.id, accountId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.chatForkService.findOne(id);
+  async findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.chatForkService.findOne(user.id, id);
   }
 
   @Post()
-  create(@Body() dto: CreateChatForkDto) {
-    return this.chatForkService.create(dto);
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateChatForkDto) {
+    return this.chatForkService.create(user.id, dto);
   }
 
   @Get(':id/messages')
-  getMessages(
+  async getMessages(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ) {
     return this.chatForkService.getMessages(
+      user.id,
       id,
       limit ? Number(limit) : 50,
       cursor,
@@ -46,7 +57,8 @@ export class ChatForkController {
   }
 
   @Post(':id/sync')
-  sync(@Param('id') id: string) {
+  async sync(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    await this.ownership.assertForkOwnership(user.id, id);
     return this.syncService.syncChatFork(id);
   }
 }

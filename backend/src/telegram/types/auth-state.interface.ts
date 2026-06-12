@@ -4,11 +4,15 @@ export interface PendingAuthState {
   client: TelegramClient;
   phone: string;
   phoneCodeHash: string;
-  isHub: boolean;
-  parentId?: string;
+  userId: string;
 }
 
 export type AuthStepResult =
   | { step: 'code_sent'; phone: string }
   | { step: 'password_required'; phone: string }
-  | { step: 'authorized'; accountId: string; phone: string; isHub: boolean };
+  | {
+      step: 'authorized';
+      accountId: string;
+      phone: string;
+      role: 'HUB';
+    };

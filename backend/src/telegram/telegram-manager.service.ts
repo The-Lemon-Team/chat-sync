@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { TelegramAccountRole } from '@prisma/client';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { Api } from 'telegram/tl';
@@ -19,10 +20,7 @@ import { AuthStepResult, PendingAuthState } from './types/auth-state.interface';
 export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramManagerService.name);
 
-  /** Активные авторизованные клиенты: accountId → TelegramClient */
   private readonly clients = new Map<string, TelegramClient>();
-
-  /** Клиенты в процессе авторизации: phone → PendingAuthState */
   private readonly pendingAuth = new Map<string, PendingAuthState>();
 
   private readonly apiId: number;
@@ -53,8 +51,6 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
     await this.disconnectAll();
   }
 
-  // ─── Public API ─────────────────────────────────────────────────────────────
-
   getClient(accountId: string): TelegramClient | undefined {
     return this.clients.get(accountId);
   }
@@ -63,13 +59,8 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
     return [...this.clients.keys()];
   }
 
-  /**
-   * Шаг 1: Отправка SMS/Telegram-кода на указанный номер.
-   */
-  async startAuth(
-    phone: string,
-    options: { isHub?: boolean; parentId?: string } = {},
-  ): Promise<AuthStepResult> {
+  /** Шаг 1: привязка Hub Telegram Account */
+  async startHubAuth(phone: string, userId: string): Promise<AuthStepResult> {
     const normalizedPhone = this.normalizePhone(phone);
 
     if (this.pendingAuth.has(normalizedPhone)) {
@@ -88,20 +79,19 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
       client,
       phone: normalizedPhone,
       phoneCodeHash: sendCodeResult.phoneCodeHash,
-      isHub: options.isHub ?? false,
-      parentId: options.parentId,
+      userId,
     });
 
-    this.logger.log(`Auth code sent to ${normalizedPhone}`);
+    this.logger.log(`Hub auth code sent to ${normalizedPhone}`);
 
     return { step: 'code_sent', phone: normalizedPhone };
   }
 
-  /**
-   * Шаг 2: Подтверждение кода из SMS/Telegram.
-   * Если включена 2FA — возвращает step: 'password_required'.
-   */
-  async submitCode(phone: string, code: string): Promise<AuthStepResult> {
+  async submitCode(
+    phone: string,
+    code: string,
+    userId: string,
+  ): Promise<AuthStepResult> {
     const normalizedPhone = this.normalizePhone(phone);
     const pending = this.pendingAuth.get(normalizedPhone);
 
@@ -111,7 +101,11 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const { client, phoneCodeHash, isHub, parentId } = pending;
+    if (pending.userId !== userId) {
+      throw new UnauthorizedException('Auth session belongs to another user');
+    }
+
+    const { client, phoneCodeHash } = pending;
 
     try {
       await client.invoke(
@@ -123,21 +117,18 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
       );
     } catch (error) {
       if (this.isPasswordNeeded(error)) {
-        this.logger.log(`2FA required for ${normalizedPhone}`);
         return { step: 'password_required', phone: normalizedPhone };
       }
       throw this.wrapTelegramError(error);
     }
 
-    return this.finalizeAuth(normalizedPhone, client, isHub, parentId);
+    return this.finalizeHubAuth(normalizedPhone, client, userId);
   }
 
-  /**
-   * Шаг 3 (опционально): Подтверждение пароля 2FA.
-   */
   async submitPassword(
     phone: string,
     password: string,
+    userId: string,
   ): Promise<AuthStepResult> {
     const normalizedPhone = this.normalizePhone(phone);
     const pending = this.pendingAuth.get(normalizedPhone);
@@ -148,7 +139,11 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const { client, isHub, parentId } = pending;
+    if (pending.userId !== userId) {
+      throw new UnauthorizedException('Auth session belongs to another user');
+    }
+
+    const { client } = pending;
 
     try {
       await client.signInWithPassword(
@@ -162,40 +157,39 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
       throw this.wrapTelegramError(error);
     }
 
-    return this.finalizeAuth(normalizedPhone, client, isHub, parentId);
+    return this.finalizeHubAuth(normalizedPhone, client, userId);
   }
 
-  /**
-   * Переподключение клиента по accountId (после обновления sessionString в БД).
-   */
   async reconnectAccount(accountId: string): Promise<void> {
     const account = await this.prisma.telegramAccount.findUnique({
       where: { id: accountId },
     });
 
-    if (!account) {
-      throw new NotFoundException(`Account ${accountId} not found`);
+    if (!account?.sessionString || account.role !== TelegramAccountRole.HUB) {
+      throw new NotFoundException(`Hub account ${accountId} not found`);
     }
 
     await this.disconnectClient(accountId);
     await this.connectAccount(account);
   }
 
-  // ─── Initialization ─────────────────────────────────────────────────────────
-
   private async initActiveClients() {
     const accounts = await this.prisma.telegramAccount.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        role: TelegramAccountRole.HUB,
+        sessionString: { not: null },
+      },
     });
 
-    this.logger.log(`Initializing ${accounts.length} active Telegram account(s)`);
+    this.logger.log(`Initializing ${accounts.length} Hub account(s)`);
 
     for (const account of accounts) {
       try {
         await this.connectAccount(account);
       } catch (error) {
         this.logger.error(
-          `Failed to connect account ${account.phone} (${account.id})`,
+          `Failed to connect hub ${account.phone} (${account.id})`,
           error,
         );
         await this.prisma.telegramAccount.update({
@@ -208,80 +202,76 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
 
   private async connectAccount(account: {
     id: string;
-    phone: string;
-    sessionString: string;
+    phone: string | null;
+    sessionString: string | null;
   }) {
+    if (!account.sessionString) {
+      throw new UnauthorizedException('Hub account has no session');
+    }
+
     const client = this.createClient(account.sessionString);
     await client.connect();
 
     if (!(await client.isUserAuthorized())) {
       throw new UnauthorizedException(
-        `Session expired for account ${account.phone}`,
+        `Session expired for hub ${account.phone}`,
       );
     }
 
     this.clients.set(account.id, client);
-    this.logger.log(`Connected Telegram client for ${account.phone}`);
+    this.logger.log(`Connected Hub client for ${account.phone}`);
   }
 
-  // ─── Auth finalization ──────────────────────────────────────────────────────
-
-  private async finalizeAuth(
+  private async finalizeHubAuth(
     phone: string,
     client: TelegramClient,
-    isHub: boolean,
-    parentId?: string,
+    userId: string,
   ): Promise<AuthStepResult> {
     const sessionString = (client.session as StringSession).save();
 
-    const account = await this.prisma.telegramAccount.upsert({
-      where: { phone },
-      create: {
-        phone,
-        sessionString,
-        isActive: true,
-        isHub,
-        parentId: parentId ?? null,
-      },
-      update: {
-        sessionString,
-        isActive: true,
-        isHub,
-        ...(parentId !== undefined && { parentId }),
-      },
+    const existingHub = await this.prisma.telegramAccount.findFirst({
+      where: { userId, role: TelegramAccountRole.HUB },
     });
 
-    if (isHub) {
-      await this.prisma.telegramAccount.updateMany({
-        where: { isHub: true, id: { not: account.id } },
-        data: { isHub: false },
-      });
-    }
+    const account = existingHub
+      ? await this.prisma.telegramAccount.update({
+          where: { id: existingHub.id },
+          data: {
+            phone,
+            sessionString,
+            isActive: true,
+            hubDetachedAt: null,
+          },
+        })
+      : await this.prisma.telegramAccount.create({
+          data: {
+            role: TelegramAccountRole.HUB,
+            phone,
+            sessionString,
+            isActive: true,
+            userId,
+          },
+        });
 
     this.clients.set(account.id, client);
     this.pendingAuth.delete(phone);
 
-    this.logger.log(`Account authorized: ${phone} (${account.id})`);
+    this.logger.log(`Hub authorized: ${phone} (${account.id})`);
 
     return {
       step: 'authorized',
       accountId: account.id,
       phone,
-      isHub: account.isHub,
+      role: 'HUB',
     };
   }
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   private createClient(sessionString: string): TelegramClient {
     return new TelegramClient(
       new StringSession(sessionString),
       this.apiId,
       this.apiHash,
-      {
-        connectionRetries: 5,
-        useWSS: false,
-      },
+      { connectionRetries: 5, useWSS: false },
     );
   }
 
@@ -314,7 +304,7 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
       try {
         await pending.client.disconnect();
       } catch {
-        // ignore disconnect errors during cleanup
+        // ignore
       }
       this.pendingAuth.delete(phone);
     }
@@ -336,7 +326,6 @@ export class TelegramManagerService implements OnModuleInit, OnModuleDestroy {
     for (const phone of this.pendingAuth.keys()) {
       await this.cleanupPendingAuth(phone);
     }
-
     for (const accountId of this.clients.keys()) {
       await this.disconnectClient(accountId);
     }
